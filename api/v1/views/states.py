@@ -1,74 +1,82 @@
 #!/usr/bin/python3
-''' new view for State objects'''
+# -*- coding: utf-8 -*-
 
-from flask import Flask
-from flask import Flask, abort
+"""view for State objects that handles all default RESTFul API actions"""
+
 from api.v1.views import app_views
-from os import name
+from flask import jsonify, abort, request
+from models import storage
 from models.state import State
-from flask import request
+from datetime import datetime
+import uuid
 
 
-@app_views.route('/status', methods=['GET'] strict_slashes=False)
-def toGet():
-    '''getting thing'''
-    objects = storage.all('State')
-    lista = []
-    for state in objects.values():
-        lista.append(state.to_dict())
-    return jsonify(lista)
+# route to list all states
 
 
-@app_views.route('/states/<string:stateid>', methods=['GET'],
-                 strict_slashes=False)
-def toGetid():
-    '''Updates a State object id'''
-    objects = storage.get('State', 'state_id')
-    if objects is None:
+@app_views.route('/states', methods=['GET'], strict_slashes=False)
+def list_states():
+    """Retrieves the list of all State objects"""
+    states = storage.all(State)
+    list_states = []
+    for state in states.values():
+        list_states.append(state.to_dict())
+    return jsonify(list_states)
+
+# route to get a state by id
+
+
+@app_views.route('/states/<state_id>', methods=['GET'], strict_slashes=False)
+def get_state(state_id):
+    """Retrieves a State object"""
+    state = storage.get(State, state_id)
+    if state:
+        return jsonify(state.to_dict())
+    else:
         abort(404)
-    return jsonify(objects.to_dict()), 'OK'
 
-
-@app_views.route('/states/', methods=['POST'],
-                 strict_slashes=False)
-def posting():
-    '''Creates a State'''
-    response = request.get_json()
-    if response id None:
-        abort(400, {'Not a JSON'})
-    if "name" not in response:
-        abort(400, {'Missing name'})
-    stateObject = State(name=response['name'])
-    storage.new(stateObject)
-    storage.save()
-    return jsonify(stateObject.to_dict()), '201'
-
-
-@app_views.route('/states/<state_id>', methods=['PUT'],
-                 strict_slashes=False)
-def putinV():
-    '''vladimir'''
-    response = request.get_json()
-    if response id None:
-        abort(400, {'Not a JSON'})
-    stateObject = storage.get(State, state_id)
-    if stateObject is None:
-        abort(404)
-    ignoreKeys = ['id', 'created_at', 'updated_at']
-    for key in response.items():
-        if key not in ignoreKeys:
-            setattr(stateObject, key)
-    storage.save()
-    return jsonify(stateObject.to_dict()), '200'
+# route to delete a state by id
 
 
 @app_views.route('/states/<state_id>', methods=['DELETE'],
                  strict_slashes=False)
-def deleting():
-    ''' to delete an onbject'''
-    stateObject = storage.get(State, state_id)
-    if stateObject is None:
+def delete_state(state_id):
+    """Deletes a State object"""
+    state = storage.get(State, state_id)
+    if state:
+        storage.delete(state)
+        storage.save()
+        return jsonify({}), 200
+    else:
         abort(404)
-    storage.delete(stateObject)
-    storage.save()
-    return jsonify({}), '200'
+
+# route to create a state
+
+
+@app_views.route('/states', methods=['POST'], strict_slashes=False)
+def create_state():
+    """Creates a State"""
+    if not request.get_json():
+        abort(400, 'Not a JSON')
+    elif 'name' not in request.get_json():
+        abort(400, 'Missing name')
+    else:
+        new_state = State(**request.get_json())
+        new_state.save()
+        return jsonify(new_state.to_dict()), 201
+
+
+# route to update a state
+@app_views.route('/states/<state_id>', methods=['PUT'], strict_slashes=False)
+def update_state(state_id):
+    """Updates a State object"""
+    state = storage.get(State, state_id)
+    if not state:
+        abort(404)
+    if not request.get_json():
+        abort(400, 'Not a JSON')
+    for key, value in request.get_json().items():
+        if key not in ['id', 'created_at', 'updated_at']:
+            setattr(state, key, value)
+    state.save()
+    return jsonify(state.to_dict()), 200
